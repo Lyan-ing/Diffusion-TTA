@@ -131,6 +131,18 @@ class DatasetCatalog:
             ),
         }
 
+        self.ImageNetOneDataset = {
+            "target": "dataset.dataset_class_label.ImageNetOneDataset",
+            "train_params": dict(
+                root=config.input.root_path + '/ImageNet/one',
+                classification_transform=self.classification_transforms,
+                diffusion_transform=self.diffusion_transforms,
+                test_classification_transform=self.test_classification_transforms,
+                test_diffusion_transform=self.test_diffusion_transforms,
+                subsample=config.input.subsample,
+            ),
+        }
+
         self.ImageNetCDataset = {   
             "target": "dataset.dataset_class_label.ImageNetCDataset",
             "train_params":dict(

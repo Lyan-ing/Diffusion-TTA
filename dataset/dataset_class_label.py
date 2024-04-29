@@ -23,6 +23,7 @@ import random
 import json
 import pickle
 from collections import defaultdict
+from copy import deepcopy
 
 import numpy as np
 from PIL import Image, ImageOps
@@ -84,7 +85,9 @@ class ImageNetBase(VisionDataset):
     ):
         super().__init__(root)
         self.class_transform = classification_transform
-        self.diffusion_transform =  diffusion_transform 
+        self.diffusion_transform = diffusion_transform
+        self.new_trans = deepcopy(test_classification_transform)
+        self.new_trans.transforms = deepcopy(test_classification_transform.transforms[:-1])
         self.test_classification_transform = test_classification_transform
         self.test_diffusion_transform =  test_diffusion_transform         
         self.classes = None 
@@ -115,7 +118,7 @@ class ImageNetBase(VisionDataset):
 
         self.class_index_mapping = new_class_index_mapping
 
-        self.classes = [int(new_class_index_mapping[val.split('/')[-1]][0]) for val in  glob.glob(self.root + '/n*')]
+        self.classes = [int(new_class_index_mapping[os.path.basename(val)][0]) for val in  glob.glob(self.root + '/n*')]
         self.classes.sort()
 
     def _set_root(self, root, split):
@@ -144,13 +147,14 @@ class ImageNetBase(VisionDataset):
 
     def __getitem__(self, index):
         filepath = self._images[index]
-        class_image = self.class_transform(Image.open(filepath).convert("RGB"))
-        diff_image = self.diffusion_transform(Image.open(filepath).convert("RGB"))
+        class_image = self.class_transform(Image.open(filepath).convert("RGB"))  # resize 232, crop224, norm
+        diff_image = self.diffusion_transform(Image.open(filepath).convert("RGB"))  # resize 232, crop224, resize256, norm
 
-        test_class_image = self.test_classification_transform(Image.open(filepath).convert("RGB"))
-        test_diff_image = self.test_diffusion_transform(Image.open(filepath).convert("RGB"))
+        test_class_image = self.test_classification_transform(Image.open(filepath).convert("RGB"))# resize 232, crop224, norm
+        test_diff_image = self.test_diffusion_transform(Image.open(filepath).convert("RGB"))  # resize 232, crop224, resize256, norm
+        # ori_img = self.new_trans(Image.open(filepath).convert("RGB"))
         
-        class_index = self.class_index_mapping[filepath.split("/")[-2]][0]
+        class_index = self.class_index_mapping[os.path.basename(os.path.dirname(filepath))][0]
         class_index = int(class_index)
         return {"image_disc":class_image,"image_gen": diff_image, "test_image_disc":test_class_image, "test_image_gen": test_diff_image, "class_idx":class_index, 'filepath': filepath, "index": index}
 
@@ -177,11 +181,32 @@ class ImageNetDataset(ImageNetBase):
         return os.path.join(self.root, '*/*.JPEG')
 
 
+class ImageNetOneDataset(ImageNetBase):
+    def __init__(
+            self,
+            root,
+            split='',
+            test_classification_transform=lambda x: x,
+            test_diffusion_transform=lambda x: x,
+            classification_transform=lambda x: x,
+            diffusion_transform=lambda x: x,
+            subsample=None,
+    ):
+        super().__init__(root, split, classification_transform, diffusion_transform,
+                         test_classification_transform, test_diffusion_transform,
+                         1)
+
+    def _set_root(self, root, split):
+        return root
+
+    def _set_glob_path(self):
+        return os.path.join(self.root, '*/*.JPEG')
+
 class ImageNetCDataset(ImageNetBase):
     def __init__(
             self,
             root,
-            split='5',
+            split='3',
             classification_transform=lambda x: x,
             diffusion_transform=lambda x: x,
             test_classification_transform=lambda x: x,
@@ -198,7 +223,7 @@ class ImageNetCDataset(ImageNetBase):
                          )
 
     def _set_root(self, root, split):
-        return os.path.join(root, 'gaussian_noise/' + split)
+        return os.path.join(root, 'blur/' + split)
 
     def _set_glob_path(self):
         return os.path.join(self.root, '*/*.JPEG')
